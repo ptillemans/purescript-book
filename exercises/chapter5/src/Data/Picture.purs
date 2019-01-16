@@ -5,6 +5,8 @@ import Prelude
 import Data.Foldable (foldl)
 import Global as Global
 import Math as Math
+import Partial.Unsafe (unsafePartial)
+import Data.Array.Partial (head, tail)
 
 data Point = Point
   { x :: Number
@@ -20,6 +22,7 @@ data Shape
   | Rectangle Point Number Number
   | Line Point Point
   | Text Point String
+  | Clipped Point Number Number Picture
 
 showShape :: Shape -> String
 showShape (Circle c r) =
@@ -30,6 +33,19 @@ showShape (Line start end) =
   "Line [start: " <> showPoint start <> ", end: " <> showPoint end <> "]"
 showShape (Text loc text) =
   "Text [location: " <> showPoint loc <> ", text: " <> show text <> "]"
+showShape (Clipped loc w h pic) =
+  "Clipped [window: " <> showShape (Rectangle loc w h) <> ", picture: " <> desc <> "]"
+  where
+    desc = joinWith ", " $ map showShape pic
+
+
+joinWith:: String -> Array String -> String
+joinWith _ [] = ""
+joinWith _ [s] = s
+joinWith separator xs = first <> separator <> rest
+  where
+    first = unsafePartial head xs
+    rest = joinWith separator $ unsafePartial tail xs
 
 type Picture = Array Shape
 
@@ -76,6 +92,7 @@ shapeBounds (Text (Point { x, y }) _) = Bounds
   , bottom: y
   , right:  x
   }
+shapeBounds (Clipped p w h _) = shapeBounds (Rectangle p w h)
 
 union :: Bounds -> Bounds -> Bounds
 union (Bounds b1) (Bounds b2) = Bounds
@@ -114,3 +131,11 @@ bounds = foldl combine emptyBounds
   where
   combine :: Bounds -> Shape -> Bounds
   combine b shape = union (shapeBounds shape) b
+
+
+area :: Shape -> Number
+area (Circle _ r) = Math.pi * r * r
+area (Rectangle _ w h) = w * h
+area (Line _ _) = 0.0
+area (Text _ _) = 0.0
+area (Clipped loc w h _) = area (Rectangle loc w h)
